@@ -40,21 +40,48 @@ turns([First,Next|GrayTail],[TurnHead,fd|TurnTail]) :-
         turns(NextTail,TurnTail).
         
 
-n_elements([],Total,Total).
-n_elements([Head|Tail],Sum,Total) :-
-        Count is Sum + 1,
-        n_elements(Tail,Count,Total).
+% getdisc/3: gets the index of the bit that changes
+getdisc([Head1|EqualTail],[Head2|EqualTail],Out) :- length(EqualTail,X),Out is X + 1.
+getdisc([EqualHead|Tail1],[EqualHead|Tail2],Out) :-
+        diffindex(Tail1,Tail2,Out).
 
+% move/4 with disc 1
+move(P,1,[L1,L2,L3],New) :-
+        (isEqual(P,0) -> %even parity: smallest disc goes left-mid-right
+            ((isEqual(L1,[1|T1]) -> isEqual(New,[T1,[1|L2],L3]);true),
+            (isEqual(L2,[1|T2]) -> isEqual(New,[L1,T2,[1|L3]]);true),
+            (isEqual(L3,[1|T3]) -> isEqual(New,[[1|L1],L2,T3]);true));true),
+        (isEqual(P,1) -> %odd parity: smallest disc goes left-right-mid
+            ((isEqual(L1,[1|T1]) -> isEqual(New,[T1,L2,[1|L3]]);true),
+            (isEqual(L2,[1|T2]) -> isEqual(New,[[1|L1],T2,L3]);true),
+            (isEqual(L3,[1|T3]) -> isEqual(New,[L1,[1|L2],T3]);true));true).
 
-% diffindex/4: gets the index of the bit that changes
-diffindex([Head1|EqualTail],[Head2|EqualTail],Schijfnr,Schijfnr).
-diffindex([EqualHead|Tail1],[EqualHead|Tail2],Teller,Schijfnr) :- 
-        Plus1 is Teller + 1,
-        diffindex(Tail1,Tail2,Plus1,Schijfnr).
+% move/4 with other discs
+move(P,Schijf,[L1,L2,L3],New) :-
+        update(Schijf,L1,L1a),
+        update(Schijf,L2,L2a),
+        update(Schijf,L3,L3a),
+        isEqual(New,[L1a,L2a,L3a]).
 
-% diffindex/3: wrapper for diffindex/4
-diffindex(L1,L2,Schijf) :- diffindex(L1,L2,0,Schijf).
+% update/3: remove the disc if it's there, add it if there's room for it.
+update(Schijf, LijstIn, LijstUit) :-
+        (isEqual(LijstIn,[Schijf|Tail]) -> isEqual(LijstUit, Tail));
+        ((isEqual(LijstIn,[]) ; (isEqual(LijstIn,[Head|Tail]), Schijf<Head)) ->
+            isEqual(LijstUit,[Schijf|LijstIn]) ;
+            isEqual(LijstIn,LijstUit)).
 
-        
-towers(P,N,GraySeq,Vorige,SpelSituaties,Verschil) :-
-        !.
+% towers/2: wrapper for towers/4.
+towers(N,[[Left,[],[]]|L]) :-
+        gray(N,GraySeq),
+        P is N mod 2,
+        findall(X,between(1,N,X),Left),
+        towers(P,GraySeq,[Left,[],[]],L).
+
+% towers/4 non-recursive
+towers(P,[LastGray],Vorige,[]).
+
+% towers/4 recursive, gets the steps taken in a towers of hanoi game.
+towers(P,[GrayHead,NextGray|GraySeq],Vorige,[SpelHead|SpelSituaties]) :-
+        getdisc(GrayHead,NextGray,Schijf),
+        move(P,Schijf,Vorige,SpelHead),
+        towers(P,[NextGray|GraySeq],SpelHead,SpelSituaties).
